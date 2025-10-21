@@ -2,67 +2,99 @@ addEventListener('fetch', event => {
     event.respondWith(handleRequest(event.request))
 })
 
+
 async function handleRequest(request) {
-    // 检查请求方法是否为 GET
     if (request.method !== 'GET') {
         return new Response('Only GET requests are allowed.', { status: 405 })
     }
 
-    // 从请求的 URL 中获取要获取标题的 URL
     const url = new URL(request.url)
-    const targetUrl = url.searchParams.get('url')
-    console.log(targetUrl)
+    let targetText = url.searchParams.get('url')
+    console.log("Raw input:", targetText)
 
-    // 如果 URL 为空，则返回错误
-    if (!targetUrl) {
+    if (!targetText) {
         return new Response('URL parameter is missing.', { status: 400 })
     }
 
-    try {
-        // 发起对目标 URL 的 GET 请求
-        const response = await fetch(targetUrl)
+    // 从文本中提取 http/https 链接
+    const urlRegex = /(https?:\/\/[^\s]+)/gi
+    const match = targetText.match(urlRegex)
+    if (!match || match.length === 0) {
+        return new Response('No valid URL found in input.', { status: 400 })
+    }
 
+    // 默认取第一个 URL
+    let targetUrl = match[0].trim()
+    console.log("Extracted URL:", targetUrl)
+
+    try {
+        // 跟踪短链接重定向（自动获取最终 URL）
+        const resolvedUrl = await resolveRedirect(targetUrl)
+        console.log("Resolved URL:", resolvedUrl)
+
+        // 获取网页标题
+        const response = await fetch(resolvedUrl)
         if (!response.ok) {
             throw new Error('Failed to fetch URL: ' + response.status)
-          }
-      
+        }
 
-        // 从响应中提取 HTML 内容
         const html = await response.text()
 
+        // 提取 <title> 或 og:title
+        let titleMatch = html.match(/<title>(.*?)<\/title>/i)
+        let title = titleMatch ? titleMatch[1].trim() : null
 
-        // 从 HTML 中提取标题
-        const titleMatch = html.match(/<title>(.*?)<\/title>/i)
-        let title = titleMatch ? titleMatch[1] : 'Title not found'
-        
-        //微信公众号获取标题
         if (!title) {
-            const ogTitleMatch = html.match(/<meta property="og:title" content="([^"]*)" \/>/i)
-            title = ogTitleMatch ? ogTitleMatch[1] : null
-          }
-        console.log(title)
-        // 将标题发送到 Notion API
-        await sendToNotion(title, targetUrl)
+            const ogTitleMatch = html.match(/<meta property="og:title" content="([^"]*)"/i)
+            title = ogTitleMatch ? ogTitleMatch[1].trim() : 'Title not found'
+        }
 
-        // 返回标题
+        console.log("Page title:", title)
+
+        // 推送到 Notion
+        await sendToNotion(title, resolvedUrl)
+
         return new Response(title, { status: 200 })
     } catch (error) {
-        // 处理异常情况
+        console.error("Error:", error)
         return new Response('Error fetching URL.', { status: 500 })
+    }
+}
+
+/**
+ * 解析短链接并返回最终跳转的 URL
+ */
+async function resolveRedirect(url) {
+    try {
+        // 发起 HEAD 请求，不下载整个页面
+        const response = await fetch(url, {
+            method: 'HEAD',
+            redirect: 'follow'
+        })
+        return response.url
+    } catch (e) {
+        // 某些短链拒绝 HEAD，可尝试 GET
+        const response = await fetch(url, {
+            method: 'GET',
+            redirect: 'follow'
+        })
+        return response.url
     }
 }
 
 
 
+
 async function sendToNotion(title, url) {
     try {
+
+        console.log(title,url)
         const newData = {
             parent: {
                 //   database_id: "YOUR_DATABASE_ID"
-                "database_id": "xxxxxxxxxxxxxxxxxxxxxx"
+                "database_id": "9cff000d-5c24-4072-8a29-2af2f0a997d5"
 
             },
-            // properties:"YOUR_properties" 
             "properties": {
                 "order": {
                     "checkbox": false
@@ -101,7 +133,6 @@ async function sendToNotion(title, url) {
             method: 'POST',
             headers: {
                 //   'Authorization': 'Bearer YOUR_NOTION_API_KEY',
-                'Authorization': 'Bearer secret_xxxxxxxxxx',
                 'Content-Type': 'application/json',
                 'Notion-Version': '2022-06-28'
             },
