@@ -1,3 +1,7 @@
+// 从环境变量获取 Notion 配置
+const NOTION_DATABASE_ID = globalThis.NOTION_DATABASE_ID;
+const NOTION_API_KEY = globalThis.NOTION_API_KEY;
+
 addEventListener('fetch', event => {
     event.respondWith(handleRequest(event.request))
 })
@@ -136,13 +140,15 @@ function extractFirstUrl(text) {
 
 async function sendToNotion(title, url) {
     try {
+        // 检查必要的环境变量是否已设置
+        if (!NOTION_DATABASE_ID || !NOTION_API_KEY) {
+            throw new Error('Missing required environment variables: NOTION_DATABASE_ID and/or NOTION_API_KEY');
+        }
 
         console.log(title,url)
         const newData = {
             parent: {
-                //   database_id: "YOUR_DATABASE_ID"
-                "database_id": "9cff000d-5c24-4072-8a29-2af2f0a997d5"
-
+                database_id: NOTION_DATABASE_ID
             },
             "properties": {
                 "order": {
@@ -181,7 +187,7 @@ async function sendToNotion(title, url) {
         const response = await fetch(notionApiUrl, {
             method: 'POST',
             headers: {
-                //   'Authorization': 'Bearer YOUR_NOTION_API_KEY',
+                'Authorization': `Bearer ${NOTION_API_KEY}`,
                 'Content-Type': 'application/json',
                 'Notion-Version': '2022-06-28'
             },

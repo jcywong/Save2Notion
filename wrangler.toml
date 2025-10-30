@@ -4,10 +4,15 @@ main = "worker.js"
 compatibility_date = "2025-10-30"
 
 # 环境变量配置
+# 这些变量在运行时会被注入到 globalThis 对象中
+# 在 worker.js 中可以通过 globalThis.NOTION_DATABASE_ID 等方式访问
 [vars]
-# 这些值会在 Cloudflare Dashboard 中设置，这里只是占位
-NOTION_DATABASE_ID = ""
-NOTION_API_KEY = ""
+# 这里的值仅作为占位符
+# 实际的值应该在：
+# 1. 生产环境：在 Cloudflare Dashboard > Workers > 你的Worker > Settings > Variables 中设置
+# 2. 开发环境：在项目根目录的 .dev.vars 文件中设置（记得将此文件加入 .gitignore）
+NOTION_DATABASE_ID = ""  # 对应 worker.js 中的 globalThis.NOTION_DATABASE_ID
+NOTION_API_KEY = ""      # 对应 worker.js 中的 globalThis.NOTION_API_KEY
 
 # 生产环境配置
 [env.production]
