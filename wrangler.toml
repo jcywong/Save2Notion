@@ -1,0 +1,20 @@
+# wrangler.toml
+name = "save2notion"
+main = "worker.js"
+compatibility_date = "2025-10-30"
+
+# 环境变量配置
+[vars]
+# 这些值会在 Cloudflare Dashboard 中设置，这里只是占位
+NOTION_DATABASE_ID = ""
+NOTION_API_KEY = ""
+
+# 生产环境配置
+[env.production]
+routes = [
+  { pattern = "your-worker.workers.dev/*", zone_name = "workers.dev" }
+]
+
+# 开发环境配置
+[env.development]
+vars = { ENVIRONMENT = "development" }

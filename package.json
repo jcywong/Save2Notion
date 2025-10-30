@@ -1,0 +1,17 @@
+{
+  "name": "save2notion",
+  "version": "1.0.0",
+  "description": "A Cloudflare Worker that extracts URLs from text and saves them to Notion",
+  "main": "worker.js",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "start": "wrangler dev"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^4.45.2"
+  },
+  "author": "jcywong",
+  "license": "MIT"
+}
