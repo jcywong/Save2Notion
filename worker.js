@@ -169,10 +169,33 @@ async function handleRequest(request) {
 
             console.log("Page title:", title)
 
-        // 推送到 Notion
-        await sendToNotion(title, resolvedUrl)
+        // 推送到 Notion 并检查返回值
+        const notionResp = await sendToNotion(title, resolvedUrl)
 
-        return new Response(title, { status: 200 })
+        // sendToNotion 可能返回 fetch 的 Response（成功或失败），也可能在 catch 中返回我们构造的 Response
+        if (notionResp && typeof notionResp === 'object' && 'status' in notionResp) {
+            try {
+                if (notionResp.ok) {
+                    // 成功：返回页面标题
+                    return new Response(title, { status: 200 })
+                } else {
+                    // Notion 返回非 2xx，读取返回体作为错误信息（如果可用）
+                    let bodyText = ''
+                    try {
+                        bodyText = await notionResp.text()
+                    } catch (e) {
+                        bodyText = ''
+                    }
+                    const msg = bodyText ? `Failed to save to Notion: ${bodyText}` : `Failed to save to Notion. Status: ${notionResp.status}`
+                    return new Response(msg, { status: 502 })
+                }
+            } catch (e) {
+                return new Response('Error processing Notion response: ' + e.message, { status: 502 })
+            }
+        } else {
+            // 非预期返回值
+            return new Response('Unexpected response from Notion integration.', { status: 502 })
+        }
     } catch (error) {
         console.error("Error:", error)
         return new Response('Error fetching URL.', { status: 500 })
@@ -240,7 +263,7 @@ async function sendToNotion(title, url) {
             throw new Error('Missing required environment variables: NOTION_DATABASE_ID and/or NOTION_API_KEY');
         }
 
-        console.log(title,url)
+        console.log("sendToNotion:",title,url)
         const newData = {
             parent: {
                 database_id: NOTION_DATABASE_ID
@@ -290,7 +313,7 @@ async function sendToNotion(title, url) {
         })
 
         // 返回 Notion API 的响应
-        console.log(response)
+        console.log("sendToNotion", response)
         return response
     } catch (error) {
         // 处理错误情况
