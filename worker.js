@@ -1,3 +1,87 @@
+
+/**
+ * 根据不同域名提取内容
+ * @param {string} domain - 域名
+ * @param {string} html - 页面 HTML
+ * @param {string} url - 完整 URL
+ * @returns {Promise<string|null>} 提取的标题
+ */
+async function extractTitleByDomain(domain, html, url) {
+    // Twitter
+    if (domain.includes('twitter.com') || domain.includes('x.com')) {
+        return extractTwitterContent(html)
+    }
+    
+    // 抖音
+    if (domain.includes('douyin.com')) {
+        return extractDouyinContent(html)
+    }
+    
+    // 小红书
+    if (domain.includes('xiaohongshu.com')) {
+        return extractXiaohongshuContent(html)
+    }
+    
+    // 如果需要更多平台，在这里添加
+    
+    return null
+}
+
+/**
+ * 从 Twitter 页面提取内容
+ */
+function extractTwitterContent(html) {
+    // 尝试获取推文内容
+    const tweetMatch = html.match(/<meta property="og:description" content="([^"]*)"/)
+    if (tweetMatch) {
+        const tweet = tweetMatch[1].trim()
+        // 移除 "在 Twitter 上发布" 等后缀
+        return tweet.replace(/\s+[\-—]\s+.*?((Twitter|X).*?)?$/, '')
+    }
+    
+    return null
+}
+
+/**
+ * 从抖音页面提取内容
+ */
+function extractDouyinContent(html) {
+    // 尝试获取视频描述
+    const descMatch = html.match(/"desc":"([^"]*)"/)
+    if (descMatch) {
+        return descMatch[1].trim()
+    }
+    
+    // 尝试获取作者名称和视频标题
+    const authorMatch = html.match(/"nickname":"([^"]*)"/)
+    const titleMatch = html.match(/"title":"([^"]*)"/)
+    if (authorMatch && titleMatch) {
+        return `${authorMatch[1]} - ${titleMatch[1]}`
+    }
+    
+    return null
+}
+
+/**
+ * 从小红书页面提取内容
+ */
+function extractXiaohongshuContent(html) {
+    // 尝试获取笔记标题
+    const titleMatch = html.match(/<meta property="og:title" content="([^"]*)"/)
+    if (titleMatch) {
+        return titleMatch[1].trim()
+    }
+    
+    // 尝试获取笔记描述
+    const descMatch = html.match(/<meta property="og:description" content="([^"]*)"/)
+    if (descMatch) {
+        const desc = descMatch[1].trim()
+        // 如果描述太长，截取合适长度
+        return desc.length > 100 ? desc.slice(0, 97) + '...' : desc
+    }
+    
+    return null
+}
 // 从环境变量获取 Notion 配置
 const NOTION_DATABASE_ID = globalThis.NOTION_DATABASE_ID;
 const NOTION_API_KEY = globalThis.NOTION_API_KEY;
@@ -63,16 +147,27 @@ async function handleRequest(request) {
 
         const html = await response.text()
 
-        // 提取 <title> 或 og:title
-        let titleMatch = html.match(/<title>(.*?)<\/title>/i)
-        let title = titleMatch ? titleMatch[1].trim() : null
+            // 获取域名并尝试特殊处理
+            const domain = new URL(resolvedUrl).hostname.toLowerCase()
+            let title = await extractTitleByDomain(domain, html, resolvedUrl)
+        
+            // 如果特殊处理没有结果，尝试常规提取
+            if (!title) {
+                // 提取 <title> 或 og:title
+                let titleMatch = html.match(/<title>(.*?)<\/title>/i)
+                title = titleMatch ? titleMatch[1].trim() : null
 
-        if (!title) {
-            const ogTitleMatch = html.match(/<meta property="og:title" content="([^"]*)"/i)
-            title = ogTitleMatch ? ogTitleMatch[1].trim() : 'Title not found'
-        }
+                if (!title) {
+                    const ogTitleMatch = html.match(/<meta property="og:title" content="([^"]*)"/i)
+                    title = ogTitleMatch ? ogTitleMatch[1].trim() : null
+                }
 
-        console.log("Page title:", title)
+                if (!title) {
+                    title = `来自 ${domain} 的内容`
+                }
+            }
+
+            console.log("Page title:", title)
 
         // 推送到 Notion
         await sendToNotion(title, resolvedUrl)
