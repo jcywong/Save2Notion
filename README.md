@@ -7,6 +7,7 @@
 - 🔍 智能 URL 提取：从任意文本中识别并提取第一个有效的 http/https 链接
 - 🔄 短链接解析：自动跟踪并解析短链接到最终 URL
 - 📑 标题获取：自动获取页面 `<title>` 或 Open Graph 标题
+- ✨ Gemini 兜底：标题缺失或无意义时，总结链接内容并生成中文标题
 - 📋 Notion 集成：将 URL 和标题保存到指定的 Notion 数据库
 - 🌐 灵活接口：支持 GET 和 POST 请求，便于各种场景使用
 
@@ -20,6 +21,18 @@
    ```
    NOTION_API_KEY=your_notion_integration_token
    NOTION_DATABASE_ID=your_database_id
+   ```
+
+   可选：如果页面标题无法提取，使用 Gemini Pro 总结内容并生成标题：
+   ```
+   GEMINI_API_KEY=your_gemini_api_key
+   GEMINI_MODEL=gemini-3.1-pro-preview  # 可选，默认值
+   GEMINI_TITLE_MAX_CHARS=12000         # 可选，发送给 Gemini 的页面文本上限
+   ```
+
+   生产环境建议将 API Key 保存为 Cloudflare Secret，而不是明文变量：
+   ```bash
+   npx wrangler secret put GEMINI_API_KEY
    ```
 
 4. 保存并部署
@@ -74,6 +87,20 @@ wrangler dev
 - 400：URL 参数缺失或未找到有效 URL
 - 405：不支持的 HTTP 方法（仅支持 GET/POST）
 - 500：获取页面标题或保存到 Notion 时出错
+
+## Gemini 标题生成说明
+
+当常规标题为空，或只是 `Untitled`、`Just a moment...`、域名等无意义内容时，Worker 会直接调用 Gemini API。Gemini 会先理解页面文本，再生成不超过 40 个中文字符的标题。
+
+请求同时启用 Gemini URL Context；因此当 Worker 未能抓取到完整 HTML 时，Gemini 仍会尝试直接读取公开链接。需登录、付费墙后的内容或某些反爬站点仍可能无法读取。如果 Gemini 也失败，Worker 会回退到域名标题。
+
+本地开发时可在项目根目录创建不会被 Git 提交的 `.dev.vars`：
+```dotenv
+NOTION_API_KEY=your_notion_integration_token
+NOTION_DATABASE_ID=your_database_id
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-3.1-pro-preview
+```
 
 ## 许可证
 
